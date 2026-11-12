@@ -2,7 +2,7 @@ import "server-only";
 
 import { headers } from "next/headers";
 import { PINTEREST_SCOPES } from "./constants";
-import { readDb, updateDb } from "./db";
+import { getConnection, updateConnectionTokens, upsertConnection } from "./db";
 import { open, seal } from "./secret";
 import type { BoardOption, PinCard } from "./types";
 
@@ -169,17 +169,15 @@ async function saveTokens(
   refreshToken: string | undefined,
   expiresIn: number,
 ) {
-  await updateDb((db) => {
-    const connection = db.connections.find((item) => item.userId === userId);
-    if (!connection) return;
-    connection.accessToken = seal(accessToken);
-    if (refreshToken) connection.refreshToken = seal(refreshToken);
-    connection.expiresAt = Date.now() + expiresIn * 1000;
+  await updateConnectionTokens(userId, {
+    accessToken: seal(accessToken),
+    refreshToken: refreshToken ? seal(refreshToken) : undefined,
+    expiresAt: Date.now() + expiresIn * 1000,
   });
 }
 
 async function accessTokenFor(userId: string) {
-  const connection = readDb().connections.find((item) => item.userId === userId);
+  const connection = await getConnection(userId);
   if (!connection) {
     throw new PinterestError("Аккаунт Pinterest не подключён.", 401);
   }
@@ -197,7 +195,7 @@ async function accessTokenFor(userId: string) {
 }
 
 async function forceRefresh(userId: string) {
-  const connection = readDb().connections.find((item) => item.userId === userId);
+  const connection = await getConnection(userId);
   if (!connection) {
     throw new PinterestError("Аккаунт Pinterest не подключён.", 401);
   }
@@ -270,17 +268,14 @@ export async function connectWithCode(
     console.error("Pinterest profile lookup failed", error);
   }
 
-  await updateDb((db) => {
-    db.connections = db.connections.filter((item) => item.userId !== userId);
-    db.connections.push({
-      userId,
-      pinterestId: account.id,
-      username: account.username,
-      profileImage: account.profile_image,
-      accessToken: seal(tokens.access_token),
-      refreshToken: seal(refreshToken),
-      expiresAt: Date.now() + tokens.expires_in * 1000,
-    });
+  await upsertConnection({
+    userId,
+    pinterestId: account.id,
+    username: account.username,
+    profileImage: account.profile_image,
+    accessToken: seal(tokens.access_token),
+    refreshToken: seal(refreshToken),
+    expiresAt: Date.now() + tokens.expires_in * 1000,
   });
 }
 

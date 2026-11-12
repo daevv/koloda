@@ -5,8 +5,16 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getUser, requireUser } from "@/lib/auth";
 import { OAUTH_REDIRECT_COOKIE, OAUTH_STATE_COOKIE, PINTEREST_SCOPES } from "@/lib/constants";
-import type { BoardRecord } from "@/lib/db";
-import { readDb, updateDb } from "@/lib/db";
+import {
+  type BoardRecord,
+  deleteLink,
+  disconnectPinterestAccount,
+  getConnection,
+  listLinks,
+  replaceBoards,
+  upsertBoard,
+  upsertLink,
+} from "@/lib/db";
 import { demoBoardsByIds } from "@/lib/demo";
 import { loadMoreForUser } from "@/lib/deck-data";
 import { parseSource, readFeed } from "@/lib/feed";
@@ -21,9 +29,7 @@ import type { BoardOption, DeckPage } from "@/lib/types";
 const LINK_PREFIX = "link:";
 
 async function storeBoards(userId: string, boards: BoardRecord[]) {
-  await updateDb((db) => {
-    db.boards = [...db.boards.filter((board) => board.userId !== userId), ...boards];
-  });
+  await replaceBoards(userId, boards);
 }
 
 export async function beginPinterestConnect() {
@@ -48,12 +54,7 @@ export async function beginPinterestConnect() {
 
 export async function disconnectPinterest() {
   const user = await requireUser();
-  await updateDb((db) => {
-    db.connections = db.connections.filter((item) => item.userId !== user.id);
-    db.boards = db.boards.filter(
-      (board) => board.userId !== user.id || board.source !== "pinterest",
-    );
-  });
+  await disconnectPinterestAccount(user.id);
   redirect("/boards");
 }
 
@@ -76,29 +77,22 @@ export async function addLink(formData: FormData) {
   const name = source.kind === "profile" ? `${feed.title} · все пины` : feed.title;
   const id = `${LINK_PREFIX}${source.feedUrl}`;
 
-  await updateDb((db) => {
-    db.links = db.links.filter((link) => !(link.userId === user.id && link.id === id));
-    db.links.push({
-      userId: user.id,
-      id,
-      feedUrl: source.feedUrl,
-      name,
-      kind: source.kind,
-      createdAt: Date.now(),
-    });
-    const rest = db.boards.filter((board) => board.userId !== user.id || board.id !== id);
-    db.boards = [
-      ...rest,
-      {
-        userId: user.id,
-        id,
-        name,
-        coverUrl: null,
-        pinCount: null,
-        source: "rss",
-        feedUrl: source.feedUrl,
-      },
-    ];
+  await upsertLink({
+    userId: user.id,
+    id,
+    feedUrl: source.feedUrl,
+    name,
+    kind: source.kind,
+    createdAt: Date.now(),
+  });
+  await upsertBoard({
+    userId: user.id,
+    id,
+    name,
+    coverUrl: null,
+    pinCount: null,
+    source: "rss",
+    feedUrl: source.feedUrl,
   });
 
   redirect("/deck");
@@ -109,10 +103,7 @@ export async function removeLink(formData: FormData) {
   const id = formData.get("id");
   if (typeof id !== "string" || !id.startsWith(LINK_PREFIX)) redirect("/boards");
 
-  await updateDb((db) => {
-    db.links = db.links.filter((link) => !(link.userId === user.id && link.id === id));
-    db.boards = db.boards.filter((board) => !(board.userId === user.id && board.id === id));
-  });
+  await deleteLink(user.id, id);
   redirect("/boards");
 }
 
@@ -144,9 +135,9 @@ export async function saveBoards(formData: FormData) {
   );
   if (ids.size === 0) redirect("/boards?error=empty");
 
-  const db = readDb();
-  const linkBoards = db.links
-    .filter((link) => link.userId === user.id && ids.has(link.id))
+  const savedLinks = await listLinks(user.id);
+  const linkBoards = savedLinks
+    .filter((link) => ids.has(link.id))
     .map(
       (link): BoardRecord => ({
         userId: user.id,
@@ -163,7 +154,7 @@ export async function saveBoards(formData: FormData) {
   let accountBoards: BoardRecord[] = [];
 
   if (otherIds.length > 0) {
-    const connected = db.connections.some((item) => item.userId === user.id);
+    const connected = Boolean(await getConnection(user.id));
     if (connected) {
       let remote: BoardOption[];
       try {

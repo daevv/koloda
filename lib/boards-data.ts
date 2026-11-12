@@ -1,7 +1,7 @@
 import "server-only";
 
 import { requireUser } from "./auth";
-import { readDb } from "./db";
+import { getConnection, listBoards, listLinks } from "./db";
 import { demoBoardOptions } from "./demo";
 import {
   getRedirectUri,
@@ -17,20 +17,20 @@ function keyFor(prefix: string, options: BoardOption[], selected: string[]) {
 
 export async function getBoardsState(): Promise<BoardsState> {
   const user = await requireUser();
-  const db = readDb();
-  const stored = db.boards.filter((board) => board.userId === user.id);
-  const connection = db.connections.find((item) => item.userId === user.id) ?? null;
+  const [stored, connection, savedLinks] = await Promise.all([
+    listBoards(user.id),
+    getConnection(user.id),
+    listLinks(user.id),
+  ]);
 
-  const links: BoardOption[] = db.links
-    .filter((link) => link.userId === user.id)
-    .map((link) => ({
-      id: link.id,
-      name: link.name,
-      pinCount: null,
-      coverUrl: null,
-      privacy: null,
-      origin: "link",
-    }));
+  const links: BoardOption[] = savedLinks.map((link) => ({
+    id: link.id,
+    name: link.name,
+    pinCount: null,
+    coverUrl: null,
+    privacy: null,
+    origin: "link",
+  }));
   const linkIds = new Set(links.map((link) => link.id));
   const linkSelected = stored
     .filter((board) => board.source === "rss" && linkIds.has(board.id))

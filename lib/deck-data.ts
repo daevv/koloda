@@ -3,7 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { requireUser } from "./auth";
 import type { BoardRecord } from "./db";
-import { readDb } from "./db";
+import { listBoards } from "./db";
 import { demoPins } from "./demo";
 import { feedPins, readFeed } from "./feed";
 import { pluralBoards } from "./plural";
@@ -71,7 +71,7 @@ async function loadFirstPage(userId: string, board: BoardRecord): Promise<Loaded
 
 export async function getDeck(): Promise<DeckResult> {
   const user = await requireUser();
-  const selected = readDb().boards.filter((board) => board.userId === user.id);
+  const selected = await listBoards(user.id);
   if (selected.length === 0) redirect("/boards");
 
   const results = await mapPool(selected, 4, async (board) => {
@@ -128,8 +128,8 @@ export async function loadMoreForUser(
   userId: string,
   cursors: Record<string, string | null>,
 ): Promise<DeckPage> {
-  const selected = readDb().boards.filter(
-    (board) => board.userId === userId && board.source === "pinterest",
+  const selected = (await listBoards(userId)).filter(
+    (board) => board.source === "pinterest",
   );
   const byId = new Map(selected.map((board) => [board.id, board]));
   const nextCursors: Record<string, string | null> = {};

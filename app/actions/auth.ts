@@ -1,8 +1,7 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
-import { readDb, updateDb } from "@/lib/db";
+import { createUser, findUserByEmail, userHasBoards } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createSession, deleteSession } from "@/lib/session";
 import type { AuthFormState, AuthMode } from "@/lib/types";
@@ -43,18 +42,10 @@ export async function authenticate(
   if (Object.keys(fields).length > 0) return { mode, fields };
 
   if (mode === "register") {
-    const passwordHash = await hashPassword(password);
-    const user = await updateDb((db) => {
-      if (db.users.some((item) => item.email === email)) return null;
-      const created = {
-        id: randomUUID(),
-        email,
-        name,
-        passwordHash,
-        createdAt: Date.now(),
-      };
-      db.users.push(created);
-      return created;
+    const user = await createUser({
+      email,
+      name,
+      passwordHash: await hashPassword(password),
     });
     if (!user) {
       return { mode, fields: { email: "Такая почта уже зарегистрирована." } };
@@ -63,13 +54,12 @@ export async function authenticate(
     redirect("/boards");
   }
 
-  const user = readDb().users.find((item) => item.email === email);
+  const user = await findUserByEmail(email);
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return { mode, error: "Неверная почта или пароль." };
   }
   await createSession(user.id);
-  const hasBoards = readDb().boards.some((board) => board.userId === user.id);
-  redirect(hasBoards ? "/deck" : "/boards");
+  redirect((await userHasBoards(user.id)) ? "/deck" : "/boards");
 }
 
 export async function logout() {
