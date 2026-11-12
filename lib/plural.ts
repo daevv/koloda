@@ -15,3 +15,7 @@ export function pluralBoards(count: number) {
 export function pluralPins(count: number) {
   return ru(count, "пин", "пина", "пинов");
 }
+
+export function pluralCards(count: number) {
+  return ru(count, "карточку", "карточки", "карточек");
+}

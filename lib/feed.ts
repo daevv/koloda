@@ -183,6 +183,7 @@ export function parseFeed(xml: string) {
     const image = /src="(https:\/\/i\.pinimg\.com\/[^"]+)"/.exec(description)?.[1];
     if (!href || !image) continue;
     items.push({
+      kind: "pin",
       id: textOf(item, "guid") || href,
       imageUrl: largeImage(image),
       title: textOf(item, "title") || "Без названия",

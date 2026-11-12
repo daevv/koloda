@@ -1,5 +1,6 @@
 import "server-only";
 
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { requireUser } from "./auth";
 import type { BoardRecord } from "./db";
@@ -7,8 +8,19 @@ import { listBoards } from "./db";
 import { demoPins } from "./demo";
 import { feedPins, readFeed } from "./feed";
 import { pluralBoards } from "./plural";
+import { getDeckPrefs } from "./prefs";
 import { fetchPinPage, pinterestErrorMessage } from "./pinterest";
-import type { DeckPage, DeckResult, PinCard } from "./types";
+import { quotesForMood, shuffle } from "./quotes";
+import type {
+  DeckCard,
+  DeckMode,
+  DeckPage,
+  DeckPrefs,
+  DeckResult,
+  PinCard,
+  QuoteCard,
+} from "./types";
+import { MOOD_LABELS } from "./types";
 
 function interleave(groups: PinCard[][]) {
   const max = groups.reduce((longest, group) => Math.max(longest, group.length), 0);
@@ -23,6 +35,25 @@ function interleave(groups: PinCard[][]) {
     }
   }
   return pins;
+}
+
+function mix(pins: PinCard[], quotes: QuoteCard[], mode: DeckMode): DeckCard[] {
+  if (mode === "pins") return pins;
+  const shuffledQuotes = shuffle(quotes);
+  if (mode === "quotes") return shuffledQuotes;
+  const cards: DeckCard[] = [...pins];
+  for (const quote of shuffledQuotes) {
+    const index = Math.floor(Math.random() * (cards.length + 1));
+    cards.splice(index, 0, quote);
+  }
+  return cards;
+}
+
+function titleFor(boards: BoardRecord[], prefs: DeckPrefs) {
+  if (prefs.mode === "quotes") return MOOD_LABELS[prefs.mood];
+  if (boards.length === 0) return MOOD_LABELS[prefs.mood];
+  if (boards.length === 1) return boards[0].name;
+  return pluralBoards(boards.length);
 }
 
 async function mapPool<T, R>(
@@ -45,11 +76,6 @@ async function mapPool<T, R>(
   return results;
 }
 
-function titleFor(boards: BoardRecord[]) {
-  if (boards.length === 1) return boards[0].name;
-  return pluralBoards(boards.length);
-}
-
 type Loaded = {
   board: BoardRecord;
   pins: PinCard[];
@@ -70,9 +96,28 @@ async function loadFirstPage(userId: string, board: BoardRecord): Promise<Loaded
 }
 
 export async function getDeck(): Promise<DeckResult> {
+  await connection();
   const user = await requireUser();
-  const selected = await listBoards(user.id);
-  if (selected.length === 0) redirect("/boards");
+  const prefs = await getDeckPrefs();
+  const selected = prefs.mode === "quotes" ? [] : await listBoards(user.id);
+  const shuffleKey = crypto.randomUUID();
+
+  if (prefs.mode === "pins" && selected.length === 0) redirect("/boards");
+
+  const quotes = prefs.mode === "pins" ? [] : quotesForMood(prefs.mood);
+  if (prefs.mode === "quotes" && quotes.length === 0) {
+    return { ok: false, message: "Нет цитат для этого настроения." };
+  }
+
+  if (selected.length === 0) {
+    return {
+      ok: true,
+      selectionKey: `quotes:${prefs.mood}:${shuffleKey}`,
+      title: titleFor(selected, prefs),
+      cards: shuffle(quotes),
+      cursors: {},
+    };
+  }
 
   const results = await mapPool(selected, 4, async (board) => {
     try {
@@ -105,18 +150,21 @@ export async function getDeck(): Promise<DeckResult> {
   }
 
   const pins = interleave(groups);
-  if (pins.length === 0 && failures.length > 0) {
+  if (pins.length === 0 && quotes.length === 0 && failures.length > 0) {
     return { ok: false, message: messages[0] };
   }
 
+  const cards = mix(pins, quotes, prefs.mode);
   return {
     ok: true,
-    selectionKey: selected
-      .map((board) => board.id)
-      .sort()
-      .join(","),
-    title: titleFor(selected),
-    pins,
+    selectionKey: [
+      prefs.mode,
+      prefs.mood,
+      shuffleKey,
+      ...selected.map((board) => board.id).sort(),
+    ].join(","),
+    title: titleFor(selected, prefs),
+    cards,
     cursors,
     warning: failures.length
       ? `Не открылись: ${failures.slice(0, 3).join(", ")}`
@@ -171,5 +219,5 @@ export async function loadMoreForUser(
     if (!byId.has(id)) delete nextCursors[id];
   }
 
-  return { pins: interleave(groups), cursors: nextCursors };
+  return { cards: interleave(groups), cursors: nextCursors };
 }

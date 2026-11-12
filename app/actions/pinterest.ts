@@ -4,7 +4,12 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getUser, requireUser } from "@/lib/auth";
-import { OAUTH_REDIRECT_COOKIE, OAUTH_STATE_COOKIE, PINTEREST_SCOPES } from "@/lib/constants";
+import {
+  freshDeckPath,
+  OAUTH_REDIRECT_COOKIE,
+  OAUTH_STATE_COOKIE,
+  PINTEREST_SCOPES,
+} from "@/lib/constants";
 import {
   type BoardRecord,
   deleteLink,
@@ -18,6 +23,7 @@ import {
 import { demoBoardsByIds } from "@/lib/demo";
 import { loadMoreForUser } from "@/lib/deck-data";
 import { readFeed, resolveSource } from "@/lib/feed";
+import { saveDeckPrefsFromForm } from "@/lib/prefs";
 import {
   getRedirectUri,
   listPinterestBoards,
@@ -61,6 +67,7 @@ export async function disconnectPinterest() {
 // Adds a public board or profile by link and puts it into the current deck.
 export async function addLink(formData: FormData) {
   const user = await requireUser();
+  await saveDeckPrefsFromForm(formData);
   const input = formData.get("link");
   const source = typeof input === "string" ? await resolveSource(input) : null;
   if (!source) redirect("/boards?error=link");
@@ -95,7 +102,7 @@ export async function addLink(formData: FormData) {
     feedUrl: source.feedUrl,
   });
 
-  redirect("/deck");
+  redirect(freshDeckPath());
 }
 
 export async function removeLink(formData: FormData) {
@@ -109,6 +116,7 @@ export async function removeLink(formData: FormData) {
 
 export async function saveBoards(formData: FormData) {
   const user = await requireUser();
+  const prefs = await saveDeckPrefsFromForm(formData);
 
   if (formData.get("intent") === "demo") {
     const boards = demoBoardsByIds(["demo:city", "demo:wild"]);
@@ -125,7 +133,7 @@ export async function saveBoards(formData: FormData) {
         }),
       ),
     );
-    redirect("/deck");
+    redirect(freshDeckPath());
   }
 
   const ids = new Set(
@@ -133,7 +141,10 @@ export async function saveBoards(formData: FormData) {
       .getAll("board")
       .filter((value): value is string => typeof value === "string"),
   );
-  if (ids.size === 0) redirect("/boards?error=empty");
+  if (ids.size === 0) {
+    if (prefs.mode === "pins") redirect("/boards?error=empty");
+    redirect(freshDeckPath());
+  }
 
   const savedLinks = await listLinks(user.id);
   const linkBoards = savedLinks
@@ -193,7 +204,7 @@ export async function saveBoards(formData: FormData) {
   if (selection.length === 0) redirect("/boards?error=empty");
 
   await storeBoards(user.id, selection);
-  redirect("/deck");
+  redirect(freshDeckPath());
 }
 
 export async function loadMorePins(

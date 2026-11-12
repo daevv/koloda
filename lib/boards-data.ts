@@ -3,6 +3,7 @@ import "server-only";
 import { requireUser } from "./auth";
 import { getConnection, listBoards, listLinks } from "./db";
 import { demoBoardOptions } from "./demo";
+import { getDeckPrefs } from "./prefs";
 import {
   getRedirectUri,
   listPinterestBoards,
@@ -11,16 +12,22 @@ import {
 } from "./pinterest";
 import type { BoardOption, BoardsState } from "./types";
 
-function keyFor(prefix: string, options: BoardOption[], selected: string[]) {
-  return `${prefix}:${options.map((option) => option.id).join(",")}|${selected.join(",")}`;
+function keyFor(
+  prefix: string,
+  options: BoardOption[],
+  selected: string[],
+  prefs: { mood: string; mode: string },
+) {
+  return `${prefix}:${prefs.mode}:${prefs.mood}:${options.map((option) => option.id).join(",")}|${selected.join(",")}`;
 }
 
 export async function getBoardsState(): Promise<BoardsState> {
   const user = await requireUser();
-  const [stored, connection, savedLinks] = await Promise.all([
+  const [stored, connection, savedLinks, prefs] = await Promise.all([
     listBoards(user.id),
     getConnection(user.id),
     listLinks(user.id),
+    getDeckPrefs(),
   ]);
 
   const links: BoardOption[] = savedLinks.map((link) => ({
@@ -54,9 +61,10 @@ export async function getBoardsState(): Promise<BoardsState> {
       connection: null,
       boards: options,
       selectedIds,
-      dataKey: keyFor("demo", options, selectedIds),
+      dataKey: keyFor("demo", options, selectedIds, prefs),
       usingDemo,
       loadError: null,
+      prefs,
     };
   }
 
@@ -78,9 +86,10 @@ export async function getBoardsState(): Promise<BoardsState> {
       },
       boards: options,
       selectedIds,
-      dataKey: keyFor(`pinterest:${connection.username}`, options, selectedIds),
+      dataKey: keyFor(`pinterest:${connection.username}`, options, selectedIds, prefs),
       usingDemo,
       loadError: null,
+      prefs,
     };
   } catch (error) {
     console.error(error);
@@ -94,9 +103,10 @@ export async function getBoardsState(): Promise<BoardsState> {
       },
       boards: links,
       selectedIds: linkSelected,
-      dataKey: keyFor(`pinterest-error:${connection.username}`, links, linkSelected),
+      dataKey: keyFor(`pinterest-error:${connection.username}`, links, linkSelected, prefs),
       usingDemo,
       loadError: pinterestErrorMessage(error),
+      prefs,
     };
   }
 }

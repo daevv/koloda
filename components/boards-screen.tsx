@@ -14,18 +14,80 @@ import { AppBar } from "@/components/app-bar";
 import { Thumb } from "@/components/photo";
 import { PINTEREST_SCOPES } from "@/lib/constants";
 import { pluralPins } from "@/lib/plural";
-import type { BoardOption, BoardsState } from "@/lib/types";
+import {
+  DECK_MODE_LABELS,
+  DECK_MODES,
+  MOOD_LABELS,
+  MOODS,
+  type BoardOption,
+  type BoardsState,
+  type DeckMode,
+  type Mood,
+} from "@/lib/types";
 
-function WatchButton({ count }: { count: number }) {
+function WatchButton({ count, mode }: { count: number; mode: DeckMode }) {
   const { pending } = useFormStatus();
+  const canWatch = mode !== "pins" || count > 0;
+  const label =
+    mode === "quotes"
+      ? "Смотреть цитаты"
+      : count > 0
+        ? `Смотреть · ${count}`
+        : "Смотреть цитаты";
   return (
     <button
       type="submit"
-      disabled={pending || count === 0}
+      disabled={pending || !canWatch}
       className="flex h-12 w-full items-center justify-center rounded-2xl bg-cream text-base font-semibold text-ink transition active:scale-[0.98] disabled:opacity-40"
     >
-      {pending ? "Открываю…" : count > 0 ? `Смотреть · ${count}` : "Выбери доску"}
+      {pending ? "Открываю…" : canWatch ? label : "Выбери доску"}
     </button>
+  );
+}
+
+function PrefsFields({ mood, mode }: { mood: Mood; mode: DeckMode }) {
+  return (
+    <>
+      <input type="hidden" name="mood" value={mood} />
+      <input type="hidden" name="mode" value={mode} />
+    </>
+  );
+}
+
+function ChoiceRow<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { id: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div>
+      <p className="text-xs tracking-wide text-muted uppercase">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {options.map((option) => {
+          const selected = option.id === value;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onChange(option.id)}
+              className={`h-9 rounded-full px-3 text-sm transition ${
+                selected
+                  ? "bg-cream font-medium text-ink"
+                  : "border border-line text-muted"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -81,6 +143,8 @@ export function BoardsScreen({
   const banner = notice && notice !== hiddenNotice ? notice : null;
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(() => new Set(data.selectedIds));
+  const [mood, setMood] = useState<Mood>(data.prefs.mood);
+  const [mode, setMode] = useState<DeckMode>(data.prefs.mode);
 
   const needle = query.trim().toLowerCase();
   const sectionTitle = data.connection ? "Твои доски" : "Демо-доски";
@@ -121,12 +185,32 @@ export function BoardsScreen({
         ) : null}
 
         <section className="rounded-3xl bg-card p-4">
+          <ChoiceRow
+            label="Что в колоде"
+            value={mode}
+            onChange={setMode}
+            options={DECK_MODES.map((id) => ({ id, label: DECK_MODE_LABELS[id] }))}
+          />
+          {mode === "pins" ? null : (
+            <div className="mt-4">
+              <ChoiceRow
+                label="Настроение"
+                value={mood}
+                onChange={setMood}
+                options={MOODS.map((id) => ({ id, label: MOOD_LABELS[id] }))}
+              />
+            </div>
+          )}
+        </section>
+
+        <section className="mt-4 rounded-3xl bg-card p-4">
           <h2 className="text-lg font-semibold">Ссылка на доску</h2>
           <p className="mt-1 text-sm leading-5 text-muted">
             Публичная доска или профиль Pinterest, без приложения. Подойдёт
             обычная ссылка или короткая pin.it из приложения.
           </p>
           <form action={addLink} className="mt-3 flex flex-col gap-2">
+            <PrefsFields mood={mood} mode={mode} />
             <input
               name="link"
               required
@@ -217,6 +301,7 @@ export function BoardsScreen({
           <div className="mt-4 rounded-2xl bg-accent/15 px-3 py-3 text-sm text-[#ffb4ae]">
             <p>{data.loadError}</p>
             <form action={saveBoards} className="mt-3">
+              <PrefsFields mood={mood} mode={mode} />
               <input type="hidden" name="intent" value="demo" />
               <button
                 type="submit"
@@ -314,8 +399,9 @@ export function BoardsScreen({
         action={saveBoards}
         className="shrink-0 border-t border-line px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
       >
+        <PrefsFields mood={mood} mode={mode} />
         <input type="hidden" name="intent" value="selection" />
-        <WatchButton count={selected.size} />
+        <WatchButton count={selected.size} mode={mode} />
       </form>
     </div>
   );

@@ -354,6 +354,7 @@ export async function fetchPinPage(
       pin.description?.trim().split("\n")[0]?.slice(0, 80) ||
       "Без названия";
     pins.push({
+      kind: "pin",
       id: pin.id,
       imageUrl,
       title,

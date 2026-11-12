@@ -5,11 +5,12 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { loadMorePins } from "@/app/actions/pinterest";
 import { AppBar, TextLink } from "@/components/app-bar";
 import { FillPhoto } from "@/components/photo";
-import type { PinCard } from "@/lib/types";
+import { pluralCards } from "@/lib/plural";
+import type { DeckCard } from "@/lib/types";
 
-function appendUnique(current: PinCard[], incoming: PinCard[]) {
-  const seen = new Set(current.map((pin) => pin.id));
-  const extra = incoming.filter((pin) => !seen.has(pin.id));
+function appendUnique(current: DeckCard[], incoming: DeckCard[]) {
+  const seen = new Set(current.map((card) => card.id));
+  const extra = incoming.filter((card) => !seen.has(card.id));
   return extra.length > 0 ? [...current, ...extra] : current;
 }
 
@@ -19,18 +20,49 @@ function hue(id: string) {
   return value;
 }
 
+function CardFace({ card, active }: { card: DeckCard; active: boolean }) {
+  if (card.kind === "quote") {
+    return (
+      <div className="flex h-full flex-col bg-[#f4efe8] px-6 py-7 text-ink">
+        <p className="text-xs tracking-[0.18em] text-ink/45 uppercase">Цитата</p>
+        <p className="mt-5 min-h-0 flex-1 overflow-y-auto text-[1.15rem] leading-7">
+          {card.text}
+        </p>
+        <div className="mt-5 shrink-0">
+          <p className="font-semibold">{card.author}</p>
+          <p className="mt-0.5 text-sm text-ink/55">
+            {card.book}
+            {card.genre ? ` · ${card.genre}` : ""}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <FillPhoto src={card.imageUrl} alt={card.title} priority={active} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-black/10" />
+      <div className="absolute inset-x-0 bottom-0 p-5">
+        <p className="text-xs tracking-wide text-white/75 uppercase">{card.boardName}</p>
+        <h2 className="mt-1 line-clamp-2 text-2xl font-semibold text-white">{card.title}</h2>
+      </div>
+    </>
+  );
+}
+
 export function SwipeDeck({
   title,
-  pins: initialPins,
+  cards: initialCards,
   cursors: initialCursors,
   warning,
 }: {
   title: string;
-  pins: PinCard[];
+  cards: DeckCard[];
   cursors: Record<string, string | null>;
   warning: string | null;
 }) {
-  const [pins, setPins] = useState(initialPins);
+  const [cards, setCards] = useState(initialCards);
   const [cursors, setCursors] = useState(initialCursors);
   const [index, setIndex] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -67,18 +99,18 @@ export function SwipeDeck({
   }, []);
 
   useEffect(() => {
-    const remaining = pins.length - index;
+    const remaining = cards.length - index;
     const hasCursor = Object.values(cursorsRef.current).some(Boolean);
     if (!hasCursor || loadingMore.current || stopped.current) return;
-    if (pins.length > 0 && remaining > 5) return;
+    if (cards.length > 0 && remaining > 5) return;
 
     loadingMore.current = true;
     loadMorePins(cursorsRef.current)
       .then((page) => {
         if (!mounted.current || !page) return;
         let added = 0;
-        setPins((current) => {
-          const next = appendUnique(current, page.pins);
+        setCards((current) => {
+          const next = appendUnique(current, page.cards);
           added = next.length - current.length;
           return next;
         });
@@ -102,7 +134,7 @@ export function SwipeDeck({
       .finally(() => {
         loadingMore.current = false;
       });
-  }, [index, pins.length]);
+  }, [index, cards.length]);
 
   const finish = useCallback(() => {
     if (committed.current) return;
@@ -119,7 +151,7 @@ export function SwipeDeck({
   }, []);
 
   const dismiss = useCallback(() => {
-    if (leaving || index >= pins.length) return;
+    if (leaving || index >= cards.length) return;
     if (reduced) {
       finish();
       return;
@@ -127,7 +159,7 @@ export function SwipeDeck({
     setLeaving(true);
     setOffset(-Math.max(window.innerWidth, 480) - 80);
     timerRef.current = window.setTimeout(finish, 420);
-  }, [finish, index, leaving, pins.length, reduced]);
+  }, [finish, index, leaving, cards.length, reduced]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -140,8 +172,8 @@ export function SwipeDeck({
   }, [dismiss]);
 
   const hasMore = Object.values(cursors).some(Boolean);
-  const current = pins[index];
-  const upcoming = pins.slice(index, index + 3);
+  const current = cards[index];
+  const upcoming = cards.slice(index, index + 3);
   const progress = Math.min(1, Math.max(0, -Math.min(offset, 0) / 240));
 
   function onPointerDown(event: ReactPointerEvent<HTMLElement>) {
@@ -180,9 +212,9 @@ export function SwipeDeck({
     <div className="flex h-full min-h-0 flex-col px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <AppBar
         eyebrow={
-          pins.length === 0
+          cards.length === 0
             ? title
-            : `${Math.min(index + 1, pins.length)} / ${pins.length}${hasMore ? "+" : ""}`
+            : `${Math.min(index + 1, cards.length)} / ${cards.length}${hasMore ? "+" : ""}`
         }
         title={title}
         trailing={<TextLink href="/boards">Доски</TextLink>}
@@ -196,14 +228,14 @@ export function SwipeDeck({
   if (!current && hasMore) {
     return shell(
       <div className="flex h-full items-center justify-center text-sm text-muted">
-        Достаю ещё фото…
+        Достаю ещё карточки…
       </div>,
       <div className="h-12" />,
     );
   }
 
   if (!current) {
-    const empty = pins.length === 0;
+    const empty = cards.length === 0;
     return shell(
       <div className="flex h-full flex-col justify-center">
         <h1 className="text-4xl font-semibold tracking-tight">
@@ -211,8 +243,8 @@ export function SwipeDeck({
         </h1>
         <p className="mt-3 max-w-xs text-base leading-6 text-muted">
           {empty
-            ? "На выбранных досках нет фотографий."
-            : `Ты посмотрел ${pins.length} фото.`}
+            ? "Нет карточек. Добавь доску или смени настроение."
+            : `Ты посмотрел ${pluralCards(cards.length)}.`}
         </p>
       </div>,
       <div className="flex flex-col gap-2">
@@ -238,9 +270,9 @@ export function SwipeDeck({
   return shell(
     <>
       {upcoming
-        .map((pin, depth) => ({ pin, depth }))
+        .map((card, depth) => ({ card, depth }))
         .reverse()
-        .map(({ pin, depth }) => {
+        .map(({ card, depth }) => {
           const gone = depth === 0 && leaving;
           const transform =
             depth === 0
@@ -248,12 +280,15 @@ export function SwipeDeck({
               : `translate3d(0, ${10 + depth * 8}px, 0) scale(${0.96 - depth * 0.03 + (depth === 1 ? progress * 0.03 : 0)})`;
           return (
             <article
-              key={pin.id}
+              key={card.id}
               className={`absolute inset-0 overflow-hidden rounded-[28px] shadow-[0_18px_50px_rgba(0,0,0,0.35)] ${
                 depth === 0 ? "z-20 touch-none" : "pointer-events-none z-10"
               }`}
               style={{
-                background: `hsl(${hue(pin.id)} 28% 16%)`,
+                background:
+                  card.kind === "quote"
+                    ? "#f4efe8"
+                    : `hsl(${hue(card.id)} 28% 16%)`,
                 transform,
                 transition:
                   depth === 0 && dragging
@@ -273,22 +308,19 @@ export function SwipeDeck({
                   : undefined
               }
             >
-              <FillPhoto src={pin.imageUrl} alt={pin.title} priority={depth === 0} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-black/10" />
+              <CardFace card={card} active={depth === 0} />
               {depth === 0 ? (
                 <div
                   className="absolute top-5 left-5 rounded-full border-2 border-white px-3 py-1 text-sm font-bold tracking-wide text-white uppercase"
-                  style={{ opacity: offset < 0 ? Math.min(1, -offset / 110) : 0 }}
+                  style={{
+                    color: card.kind === "quote" ? "#1a120f" : "white",
+                    borderColor: card.kind === "quote" ? "#1a120f" : "white",
+                    opacity: offset < 0 ? Math.min(1, -offset / 110) : 0,
+                  }}
                 >
                   Далее
                 </div>
               ) : null}
-              <div className="absolute inset-x-0 bottom-0 p-5">
-                <p className="text-xs tracking-wide text-white/75 uppercase">{pin.boardName}</p>
-                <h2 className="mt-1 line-clamp-2 text-2xl font-semibold text-white">
-                  {pin.title}
-                </h2>
-              </div>
             </article>
           );
         })}
@@ -297,7 +329,7 @@ export function SwipeDeck({
       <div className="h-1 overflow-hidden rounded-full bg-white/10">
         <div
           className="h-full bg-cream"
-          style={{ width: `${(index / pins.length) * 100}%` }}
+          style={{ width: `${(index / cards.length) * 100}%` }}
         />
       </div>
       <p className="text-center text-sm text-muted">
@@ -308,14 +340,20 @@ export function SwipeDeck({
             : "Свайпни влево, чтобы открыть следующее"}
         <span className="hidden sm:inline"> · или ←</span>
       </p>
-      <a
-        href={current.href}
-        target="_blank"
-        rel="noreferrer"
-        className="text-center text-sm text-white/75 underline-offset-4 hover:underline"
-      >
-        {current.href.includes("pinterest.com") ? "Открыть пин" : "Открыть фото"}
-      </a>
+      {current.kind === "pin" ? (
+        <a
+          href={current.href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-center text-sm text-white/75 underline-offset-4 hover:underline"
+        >
+          {current.href.includes("pinterest.com") ? "Открыть пин" : "Открыть фото"}
+        </a>
+      ) : (
+        <p className="text-center text-sm text-muted">
+          {current.author} · {current.book}
+        </p>
+      )}
       <button
         type="button"
         onClick={dismiss}

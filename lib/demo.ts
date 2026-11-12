@@ -7,6 +7,7 @@ type DemoBoard = BoardOption & { pins: PinCard[] };
 function pin(boardName: string, title: string, photoId: string): PinCard {
   const imageUrl = `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=1200&q=80`;
   return {
+    kind: "pin",
     id: `demo-${photoId}`,
     imageUrl,
     title,

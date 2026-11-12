@@ -1,4 +1,9 @@
 export const SESSION_COOKIE = "koloda_session";
+export const PREFS_COOKIE = "koloda_prefs";
+
+export function freshDeckPath() {
+  return `/deck?s=${crypto.randomUUID().slice(0, 8)}`;
+}
 export const OAUTH_STATE_COOKIE = "koloda_oauth_state";
 export const OAUTH_REDIRECT_COOKIE = "koloda_oauth_redirect";
 

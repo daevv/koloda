@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { isNextInterrupt, publicErrorMessage } from "@/lib/action-error";
+import { freshDeckPath } from "@/lib/constants";
 import { createUser, findUserByEmail, userHasBoards } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createSession, deleteSession } from "@/lib/session";
@@ -61,7 +62,7 @@ export async function authenticate(
       return { mode, error: "Неверная почта или пароль." };
     }
     await createSession(user.id);
-    redirect((await userHasBoards(user.id)) ? "/deck" : "/boards");
+    redirect((await userHasBoards(user.id)) ? freshDeckPath() : "/boards");
   } catch (error) {
     if (isNextInterrupt(error)) throw error;
     console.error(error);
