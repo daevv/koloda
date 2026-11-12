@@ -1,0 +1,11 @@
+export const SESSION_COOKIE = "koloda_session";
+export const OAUTH_STATE_COOKIE = "koloda_oauth_state";
+export const OAUTH_REDIRECT_COOKIE = "koloda_oauth_redirect";
+
+export const PINTEREST_SCOPES = [
+  "boards:read",
+  "boards:read_secret",
+  "pins:read",
+  "pins:read_secret",
+  "user_accounts:read",
+] as const;
