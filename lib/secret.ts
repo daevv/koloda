@@ -16,12 +16,22 @@ function secretFile() {
   return path.join(process.cwd(), "data", "session-secret");
 }
 
+function isServerless() {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
 export function getSecret() {
   if (cached) return cached;
   const fromEnv = process.env.SESSION_SECRET?.trim();
   if (fromEnv && fromEnv.length >= 32) {
     cached = fromEnv;
     return cached;
+  }
+
+  if (isServerless() || process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Нет SESSION_SECRET. Добавь в Vercel переменную SESSION_SECRET — случайную строку не короче 32 символов.",
+    );
   }
 
   const file = secretFile();

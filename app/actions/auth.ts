@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isNextInterrupt, publicErrorMessage } from "@/lib/action-error";
 import { createUser, findUserByEmail, userHasBoards } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createSession, deleteSession } from "@/lib/session";
@@ -41,25 +42,31 @@ export async function authenticate(
   const { fields, email, password, name } = validate(mode, formData);
   if (Object.keys(fields).length > 0) return { mode, fields };
 
-  if (mode === "register") {
-    const user = await createUser({
-      email,
-      name,
-      passwordHash: await hashPassword(password),
-    });
-    if (!user) {
-      return { mode, fields: { email: "Такая почта уже зарегистрирована." } };
+  try {
+    if (mode === "register") {
+      const user = await createUser({
+        email,
+        name,
+        passwordHash: await hashPassword(password),
+      });
+      if (!user) {
+        return { mode, fields: { email: "Такая почта уже зарегистрирована." } };
+      }
+      await createSession(user.id);
+      redirect("/boards");
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      return { mode, error: "Неверная почта или пароль." };
     }
     await createSession(user.id);
-    redirect("/boards");
+    redirect((await userHasBoards(user.id)) ? "/deck" : "/boards");
+  } catch (error) {
+    if (isNextInterrupt(error)) throw error;
+    console.error(error);
+    return { mode, error: publicErrorMessage(error) };
   }
-
-  const user = await findUserByEmail(email);
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return { mode, error: "Неверная почта или пароль." };
-  }
-  await createSession(user.id);
-  redirect((await userHasBoards(user.id)) ? "/deck" : "/boards");
 }
 
 export async function logout() {
