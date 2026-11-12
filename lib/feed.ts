@@ -38,6 +38,22 @@ function isPinterestHost(host: string) {
   return /(^|\.)pinterest\.[a-z]{2,3}(\.[a-z]{2})?$/i.test(host);
 }
 
+function isPinItHost(host: string) {
+  return host === "pin.it" || host.endsWith(".pin.it");
+}
+
+function isAllowedHop(host: string) {
+  return isPinterestHost(host) || isPinItHost(host);
+}
+
+function parseUrl(input: string) {
+  try {
+    return new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`);
+  } catch {
+    return null;
+  }
+}
+
 function safeDecode(value: string) {
   try {
     return decodeURIComponent(value);
@@ -58,13 +74,8 @@ export function parseSource(input: string): FeedSource | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  let url: URL;
-  try {
-    url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
-  } catch {
-    return null;
-  }
-  if (!isPinterestHost(url.hostname)) return null;
+  const url = parseUrl(trimmed);
+  if (!url || !isPinterestHost(url.hostname)) return null;
 
   const raw = url.pathname.split("/").filter(Boolean);
   if (raw.length === 0 || raw.length > 2) return null;
@@ -79,6 +90,60 @@ export function parseSource(input: string): FeedSource | null {
   }
   if (!SEGMENT.test(slug) || slug.startsWith("_")) return null;
   return { kind: "board", feedUrl: `${FEED_ORIGIN}/${raw[0]}/${raw[1]}.rss` };
+}
+
+function pinItCode(pathname: string) {
+  const code = pathname.replaceAll("/", "");
+  return /^[A-Za-z0-9]{4,24}$/.test(code) ? code : null;
+}
+
+// App share links look like pin.it/1aWhqlta4 and redirect through
+// api.pinterest.com/url_shortener/... to the public board or profile.
+export async function resolveSource(input: string): Promise<FeedSource | null> {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const url = parseUrl(trimmed);
+  if (!url) return null;
+  if (isPinterestHost(url.hostname)) return parseSource(url.href);
+  if (!isPinItHost(url.hostname)) return null;
+
+  const code = pinItCode(url.pathname);
+  if (!code) return null;
+
+  let current = new URL(`https://pin.it/${code}`);
+  for (let hop = 0; hop < 8; hop += 1) {
+    if (!isAllowedHop(current.hostname)) return null;
+    const parsed = parseSource(current.href);
+    if (parsed) return parsed;
+
+    let response: Response;
+    try {
+      response = await fetch(current.href, {
+        method: "GET",
+        redirect: "manual",
+        headers: {
+          Accept: "text/html",
+          "User-Agent": USER_AGENT,
+        },
+        cache: "no-store",
+      });
+    } catch {
+      return null;
+    }
+
+    const location = response.headers.get("location");
+    if (location && response.status >= 300 && response.status < 400) {
+      try {
+        current = new URL(location, current);
+      } catch {
+        return null;
+      }
+      continue;
+    }
+    return parseSource(current.href);
+  }
+  return null;
 }
 
 function decodeEntities(value: string) {

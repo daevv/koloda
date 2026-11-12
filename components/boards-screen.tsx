@@ -123,8 +123,8 @@ export function BoardsScreen({
         <section className="rounded-3xl bg-card p-4">
           <h2 className="text-lg font-semibold">Ссылка на доску</h2>
           <p className="mt-1 text-sm leading-5 text-muted">
-            Публичная доска или профиль Pinterest, без приложения. Например:
-            pinterest.com/имя/название-доски
+            Публичная доска или профиль Pinterest, без приложения. Подойдёт
+            обычная ссылка или короткая pin.it из приложения.
           </p>
           <form action={addLink} className="mt-3 flex flex-col gap-2">
             <input
@@ -134,7 +134,7 @@ export function BoardsScreen({
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="pinterest.com/имя/доска"
+              placeholder="pin.it/… или pinterest.com/имя/доска"
               className="h-12 w-full rounded-2xl border border-line bg-white/5 px-4 text-base outline-none placeholder:text-muted focus:border-white/30"
             />
             <AddLinkButton />

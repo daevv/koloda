@@ -17,7 +17,7 @@ import {
 } from "@/lib/db";
 import { demoBoardsByIds } from "@/lib/demo";
 import { loadMoreForUser } from "@/lib/deck-data";
-import { parseSource, readFeed } from "@/lib/feed";
+import { readFeed, resolveSource } from "@/lib/feed";
 import {
   getRedirectUri,
   listPinterestBoards,
@@ -62,7 +62,7 @@ export async function disconnectPinterest() {
 export async function addLink(formData: FormData) {
   const user = await requireUser();
   const input = formData.get("link");
-  const source = typeof input === "string" ? parseSource(input) : null;
+  const source = typeof input === "string" ? await resolveSource(input) : null;
   if (!source) redirect("/boards?error=link");
 
   let feed: Awaited<ReturnType<typeof readFeed>>;

@@ -25,8 +25,17 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  height: 100%;
+  touch-action: pan-x pan-y;
+  -ms-touch-action: pan-x pan-y;
+  overscroll-behavior: none;
+}
+
 body {
   font-family: var(--font-sans), sans-serif;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: none;
 }
 
 button,

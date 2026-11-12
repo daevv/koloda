@@ -28,12 +28,15 @@ export function AuthScreen() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-      <div className="relative mx-auto mt-4 h-40 w-full max-w-72" aria-hidden>
-        <div className="absolute top-6 left-2 h-32 w-24 -rotate-12 rounded-2xl bg-gradient-to-br from-[#c17f59] to-[#3d2a24] shadow-2xl" />
-        <div className="absolute top-1 left-16 h-36 w-28 rotate-6 rounded-2xl bg-gradient-to-br from-[#6e8b74] to-[#1d2a22] shadow-2xl" />
-        <div className="absolute top-5 right-2 h-32 w-24 rotate-3 rounded-2xl bg-gradient-to-br from-[#d7c4a3] to-[#6a5644] shadow-2xl" />
+      <div
+        className="relative mx-auto mt-4 mb-2 h-28 w-full max-w-56 shrink-0 overflow-hidden"
+        aria-hidden
+      >
+        <div className="absolute top-5 left-1 h-24 w-16 -rotate-12 rounded-2xl bg-gradient-to-br from-[#c17f59] to-[#3d2a24] shadow-xl" />
+        <div className="absolute top-2 left-16 h-28 w-20 rotate-6 rounded-2xl bg-gradient-to-br from-[#6e8b74] to-[#1d2a22] shadow-xl" />
+        <div className="absolute top-4 right-2 h-24 w-16 rotate-3 rounded-2xl bg-gradient-to-br from-[#d7c4a3] to-[#6a5644] shadow-xl" />
       </div>
-      <h1 className="mt-6 text-[2rem] leading-9 font-semibold tracking-tight">
+      <h1 className="relative z-10 text-[2rem] leading-9 font-semibold tracking-tight">
         Листай доски как колоду
       </h1>
       <p className="mt-2 text-base leading-6 text-muted">
