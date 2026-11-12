@@ -33,15 +33,19 @@ export function AuthScreen() {
         aria-hidden
       >
         <div className="absolute top-5 left-1 h-24 w-16 -rotate-12 rounded-2xl bg-gradient-to-br from-[#c17f59] to-[#3d2a24] shadow-xl" />
-        <div className="absolute top-2 left-16 h-28 w-20 rotate-6 rounded-2xl bg-gradient-to-br from-[#6e8b74] to-[#1d2a22] shadow-xl" />
-        <div className="absolute top-4 right-2 h-24 w-16 rotate-3 rounded-2xl bg-gradient-to-br from-[#d7c4a3] to-[#6a5644] shadow-xl" />
+        <div className="absolute top-2 left-16 h-28 w-20 rotate-3 rounded-2xl bg-[#f4efe8] px-2.5 py-3 shadow-xl">
+          <span className="block h-1.5 w-10 rounded-full bg-ink/20" />
+          <span className="mt-2 block h-1.5 w-12 rounded-full bg-ink/15" />
+          <span className="mt-1.5 block h-1.5 w-8 rounded-full bg-ink/10" />
+        </div>
+        <div className="absolute top-4 right-2 h-24 w-16 rotate-12 rounded-2xl bg-gradient-to-br from-[#6e8b74] to-[#1d2a22] shadow-xl" />
       </div>
       <h1 className="relative z-10 text-[2rem] leading-9 font-semibold tracking-tight">
-        Листай доски как колоду
+        Листай доски и цитаты
       </h1>
       <p className="mt-2 text-base leading-6 text-muted">
-        Подключи Pinterest, выбери доски и смотри фотографии. Свайп пока только
-        вперёд.
+        Одна карточка за раз — пины с досок и короткие тексты. Можно всё вместе
+        или по отдельности. Свайп только вперёд.
       </p>
       <div className="mt-6 grid grid-cols-2 rounded-2xl bg-white/5 p-1">
         {(

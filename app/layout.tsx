@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     default: "Koloda",
     template: "%s · Koloda",
   },
-  description: "Листай фотографии со своих досок Pinterest",
+  description: "Листай доски Pinterest и цитаты одной карточкой за раз",
   applicationName: "Koloda",
   appleWebApp: {
     capable: true,

@@ -5,7 +5,7 @@ import { isNextInterrupt, publicErrorMessage } from "@/lib/action-error";
 import { freshDeckPath } from "@/lib/constants";
 import { createUser, findUserByEmail, userHasBoards } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
-import { createSession, deleteSession } from "@/lib/session";
+import { createSession, deleteSession, markOnboardingSeen } from "@/lib/session";
 import type { AuthFormState, AuthMode } from "@/lib/types";
 
 function text(formData: FormData, key: string) {
@@ -68,6 +68,10 @@ export async function authenticate(
     console.error(error);
     return { mode, error: publicErrorMessage(error) };
   }
+}
+
+export async function finishOnboarding() {
+  await markOnboardingSeen();
 }
 
 export async function logout() {

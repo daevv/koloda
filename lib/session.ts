@@ -2,7 +2,7 @@ import "server-only";
 
 import { jwtVerify, SignJWT } from "jose";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE } from "./constants";
+import { ONBOARDING_COOKIE, SESSION_COOKIE } from "./constants";
 import { getSecret } from "./secret";
 
 function key() {
@@ -33,6 +33,18 @@ export async function createSession(userId: string) {
 export async function deleteSession() {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+}
+
+export async function markOnboardingSeen() {
+  const jar = await cookies();
+  jar.set(ONBOARDING_COOKIE, "1", {
+    ...cookieBase(),
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
+
+export async function hasSeenOnboarding() {
+  return (await cookies()).get(ONBOARDING_COOKIE)?.value === "1";
 }
 
 export async function getSessionUserId() {
